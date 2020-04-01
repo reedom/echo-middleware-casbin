@@ -27,7 +27,7 @@ func (r *testDataSource) GetSubject(c echo.Context) string {
 	return c.Get("user").(string)
 }
 
-func TestRoleAdminStatusOK(t *testing.T) {
+func TestPermissions(t *testing.T) {
 	// Given
 	ce, err := casbin.NewEnforcer("auth_model.conf", "auth_policy.conf")
 	if err != nil {

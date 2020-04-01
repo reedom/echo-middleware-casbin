@@ -12,8 +12,18 @@ import (
 type (
 	// Config defines the config for this middleware.
 	Config struct {
+		// Skipper defines a function to skip middleware.
 		Skipper    middleware.Skipper
+		// BeforeFunc defines a function which is executed just before the middleware.
+		BeforeFunc middleware.BeforeFunc
+		// SuccessHandler defines a function which is executed for a granted access.
+		SuccessHandler func(echo.Context)
+		// ErrorHandler defines a function which is executed for a rejected access.
+		// It may be used to define a custom error.
+		ErrorHandler func(error, echo.Context) error
+		// Enforcer instance.
 		Enforcer   *casbin.Enforcer
+		// DataSource is the interface that extract a subject from echo.Context.
 		DataSource DataSource
 	}
 )
@@ -47,10 +57,23 @@ func MiddlewareWithConfig(config Config) echo.MiddlewareFunc {
 			if config.Skipper(c) {
 				return next(c)
 			}
-			if ok, err := config.HasPermission(c); err == nil && ok {
-				return next(c)
-			} else if err != nil {
+			if config.BeforeFunc != nil {
+				config.BeforeFunc(c)
+			}
+
+			ok, err := config.HasPermission(c)
+			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+
+			if ok {
+				if config.SuccessHandler != nil {
+					config.SuccessHandler(c)
+				}
+				return next(c)
+			}
+			if config.ErrorHandler != nil {
+				return config.ErrorHandler(echo.ErrForbidden, c)
 			}
 			return echo.ErrForbidden
 		}
