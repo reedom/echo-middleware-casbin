@@ -13,16 +13,18 @@ type (
 	// Config defines the config for this middleware.
 	Config struct {
 		// Skipper defines a function to skip middleware.
-		Skipper    middleware.Skipper
+		Skipper middleware.Skipper
 		// BeforeFunc defines a function which is executed just before the middleware.
 		BeforeFunc middleware.BeforeFunc
+		// GetURLPathFunc defines a function which return the requested URL.
+		GetURLPathFunc func(ctx echo.Context) string
 		// SuccessHandler defines a function which is executed for a granted access.
 		SuccessHandler func(echo.Context)
 		// ErrorHandler defines a function which is executed for a rejected access.
 		// It may be used to define a custom error.
 		ErrorHandler func(error, echo.Context) error
 		// Enforcer instance.
-		Enforcer   *casbin.Enforcer
+		Enforcer *casbin.Enforcer
 		// DataSource is the interface that extract a subject from echo.Context.
 		DataSource DataSource
 	}
@@ -52,6 +54,12 @@ func MiddlewareWithConfig(config Config) echo.MiddlewareFunc {
 	if config.Skipper == nil {
 		config.Skipper = DefaultConfig.Skipper
 	}
+	if config.GetURLPathFunc == nil {
+		config.GetURLPathFunc = func(c echo.Context) string {
+			return c.Request().URL.Path
+		}
+	}
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if config.Skipper(c) {
@@ -61,7 +69,8 @@ func MiddlewareWithConfig(config Config) echo.MiddlewareFunc {
 				config.BeforeFunc(c)
 			}
 
-			ok, err := config.HasPermission(c)
+			urlPath := config.GetURLPathFunc(c)
+			ok, err := config.HasPermission(c, urlPath)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
@@ -87,6 +96,6 @@ func (a *Config) GetSubject(c echo.Context) string {
 
 // HasPermission checks a resource access permission against casbin with the subject/method/path combination from the request.
 // Returns true (permission granted) or false (permission forbidden).
-func (a *Config) HasPermission(c echo.Context) (bool, error) {
-	return a.Enforcer.Enforce(a.GetSubject(c), c.Request().URL.Path, c.Request().Method)
+func (a *Config) HasPermission(c echo.Context, urlPath string) (bool, error) {
+	return a.Enforcer.Enforce(a.GetSubject(c), urlPath, c.Request().Method)
 }
