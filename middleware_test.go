@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/casbin/casbin/v2"
@@ -45,6 +46,7 @@ func TestPermissions(t *testing.T) {
 		{"admin", "/login", http.MethodPost, http.StatusOK},
 		{"anonymous", "/", http.MethodGet, http.StatusForbidden},
 		{"anonymous", "/login", http.MethodGet, http.StatusOK},
+		{"anonymous", "/login?a=b", http.MethodGet, http.StatusOK},
 		{"anonymous", "/login", http.MethodPut, http.StatusForbidden},
 	}
 
@@ -54,7 +56,8 @@ func TestPermissions(t *testing.T) {
 			e := echo.New()
 			e.Use(setUserMiddleware(tt.user))
 			e.Use(casbinmw.Middleware(ce, &testDataSource{}))
-			e.Any(tt.path, func(c echo.Context) error {
+			u, _ := url.Parse(tt.path)
+			e.Any(u.Path, func(c echo.Context) error {
 				return c.JSON(http.StatusOK, "OK")
 			})
 			req := httptest.NewRequest(tt.method, tt.path, nil)

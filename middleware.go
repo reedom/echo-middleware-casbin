@@ -2,6 +2,7 @@ package casbinmw
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/casbin/casbin/v2"
 
@@ -56,7 +57,11 @@ func MiddlewareWithConfig(config Config) echo.MiddlewareFunc {
 	}
 	if config.GetURLPathFunc == nil {
 		config.GetURLPathFunc = func(c echo.Context) string {
-			return c.Request().URL.Path
+			u, err := url.Parse(c.Request().URL.Path)
+			if err != nil {
+				return c.Request().URL.Path
+			}
+			return u.Path
 		}
 	}
 
